@@ -1,0 +1,199 @@
+########################################################################################################################
+# GNU stow helpers
+
+
+# GNU stow operates on packages - minimal working units that represent collections of files and directories to back up:
+# https://www.gnu.org/software/stow/manual/stow.html#Terminology
+#
+# E.g. in your $HOME/backup/dotfiles you have directory 'homeroot' where you plan to store
+# packages that represent config files stored in your home directory.
+#
+# Then you might have sub-dirs homeroot/bash and homeroot/zsh, each storing a set of config files for respective shell.
+# Here 'bash' and 'zsh' are packages.
+# While 'homeroot' is a kind of category for convenient labeling of miscellaneous configurations.
+#
+# Current implementation defines three categories:
+#   - homeroot  - for storing configurations from $HOME directory
+#   - dotconfig - for storing configurations from $HOME/.config directory
+#   - other     - for storing configurations from other places
+#
+# So, the backup storage is located in $HOME/backup/dotfiles and uses following structure:
+#    dotfiles
+#        ├── dotconfig
+#        ├── homeroot
+#        └── other
+#        dotfiles/secrets
+#        ├── dotconfig
+#        ├── homeroot
+#        └── other
+#
+# Secrets (located in a 'secrets' sub-dir) is a sub-storage for backing up anything that contains
+# passwords, auth keys, and any other kinds of sensitive information.
+#
+# Categories are stored in __DF_* variables defined below, as well as the root storage path and path to 'secrets'.
+# These are configurable things.
+# Just:
+#    - add/remove/change your categories
+#    - change paths if needed
+#    - update __DF_CATEGORIES variable with appropriate categories
+
+
+# Next aliases and functions are at your disposal:
+#    stow-ls-structure - for listing storage structure (tree-view)
+#    stow-ls-packages  - for listing all stowed packages (tree-view)
+#
+#    stow-simulate - for running stow packaging in simulation mode (stow option -n)
+#    stow-do       - for stowing packages
+#    stow-force    - for stowing packages in forced mode (stow option --adopt)
+#    stow-unstow   - for un-stowing packages (stow option -D)
+#    stow-restow   - for re-stowing packages (stow option -R)
+#
+
+
+# 'DF' stands for 'DOTFILES'
+__DF_ROOT=$HOME/backup/dotfiles  # root storage directory
+__DF_SECRETS=secrets             # sub-directory name for packages with sensitive info (passwords, auth tokens, etc.)
+__DF_SECRETS_ROOT=$__DF_ROOT/$__DF_SECRETS  # root secrets sub-directory
+__DF_CATEGORY_DOTCONF=dotconfig       # inner directory name for packages in category 'dotconfig'
+__DF_CATEGORY_HOME=homeroot           # inner directory name for packages in category 'homeroot'
+__DF_CATEGORY_OTHER=other             # inner directory name for packages in category 'other'
+__DF_CATEGORIES="$__DF_CATEGORY_DOTCONF $__DF_CATEGORY_HOME $__DF_CATEGORY_OTHER"    # all categories
+
+
+alias stow-ls-structure="env tree -dL 1 -I $__DF_SECRETS $__DF_ROOT --noreport &&
+                         env tree -dL 1 $__DF_SECRETS_ROOT --noreport"
+alias stow-ls-packages="env tree -dL 2 -I $__DF_SECRETS $__DF_ROOT --noreport &&
+                        env tree -dL 2 $__DF_SECRETS_ROOT --noreport"
+
+
+# General autocompletion function for using in specific functions.
+# Usage examples for function 'foo' bound to use completions:
+#      foo <TAB><TAB> -> should output "dotconfig homeroot other secrets"
+#      foo sec<TAB><TAB> -> should output "secrets"
+#      foo secrets <TAB><TAB> -> should output "dotconfig homeroot"
+#      foo dotconfig <TAB><TAB> -> should output packages in category 'dotconfig'
+#      foo secrets homeroot <TAB><TAB> -> should output packages in category 'homeroot' of 'secrets' sub-storage
+function __stow_package_completion(){
+    latest="${COMP_WORDS[$COMP_CWORD]}"
+    categories_array=($__DF_CATEGORIES)
+
+    arg1="${COMP_WORDS[1]}"
+    arg2="${COMP_WORDS[2]}"
+    completions=""
+
+    if [ $COMP_CWORD -eq 1 ]; then
+        # no args specified yet - choose category or 'secrets'
+
+        # autocomplete with actual (existing) categories in root storage directory + 'secrets' directory
+        root_categories=$(cd $__DF_ROOT && env ls -d $__DF_CATEGORIES 2>/dev/null)
+        completions="$root_categories $__DF_SECRETS"
+    elif [ $arg1 == $__DF_SECRETS ] && [ $COMP_CWORD -eq 2 ]; then
+        # first arg is 'secrets', no 2nd arg specified yet - choose category under 'secrets'
+
+        # autocomplete with actual (existing) categories in 'secrets' sub-directory
+        completions="$(cd $__DF_SECRETS_ROOT && env ls -d $__DF_CATEGORIES 2>/dev/null)"
+    elif [[ ${categories_array[@]} =~ $arg1 ]]; then
+        # first arg is a package category - choose package
+
+        completions=$(env ls $__DF_ROOT/$arg1 $(__build_completion_exclusions ${COMP_WORDS[@]}))
+    elif [ "$arg1" == "$__DF_SECRETS" ] && [[ ${categories_array[@]} =~ $arg2 ]]; then
+        # first arg is 'secrets'
+        # second arg is a package category - choose package
+
+        completions=$(env ls $__DF_ROOT/$arg1/$arg2 $(__build_completion_exclusions ${COMP_WORDS[@]}))
+    fi
+    COMPREPLY=($(compgen -W "$completions" -- $latest))
+    return 0
+}
+
+# Build exclusions for completions we already selected, echo result (as bash cannot return strings).
+# This result will be evaluated by calling function.
+function __build_completion_exclusions() {
+    exclusions=""  # -I option for ls command excludes files enumerated after it from displaying
+    for package in $@; do
+        exclusions+=" -I $package"
+    done
+    echo $exclusions
+}
+
+# Build arguments for stow command from autocomplete args returned by caller function.
+# Args that are category directories or 'secrets' become parts of storage path.
+# Remainder args will be treaded as stow packages.
+function __build_stow_args() {
+    arg_num=1
+    directories=($__DF_CATEGORIES $__DF_SECRETS)
+    path_to_packages=$__DF_ROOT
+
+    for arg in $@; do
+        if [[ ${directories[@]} =~ $arg ]]; then
+            path_to_packages+="/$arg"
+            ((arg_num++))
+        else
+            break
+        fi
+    done
+
+    # remainder args - treat them as stow packages
+    stow_packages=${@:$arg_num}
+    if [ -z "$stow_packages" ]; then
+        return 1 # no packages specified
+    fi
+
+    stow_args="-v -d $path_to_packages -t $HOME $stow_packages"
+    echo $stow_args # result will be evaluated by calling function
+}
+
+# Make an actual execute of stow command and process passed arguments.
+# If last arg starts with '-' then extract it; from remainder args build stow command arguments (path/packages).
+function __stow_execute() {
+    stow_exec_option=""
+
+    last_arg="${@: -1}"
+    if [[ $last_arg == -* ]]; then    # last arg starts with '-' (like '-n' in 'stow-simulate')
+        stow_exec_option+=$last_arg   # treat this arg as an option to the 'stow' command
+        stow_args="$(__build_stow_args ${@:1:$#-1})" # from remainder args build stow arguments (path/packages)
+    else
+        stow_args="$(__build_stow_args $@)" # last arg does not start with '-', build stow arguments from all args
+    fi
+
+    # check return value of previous action (execution of __build_stow_args)
+    retval=$?
+    if [ $retval -ne 0 ]; then
+        # if return value is not 0, then no packages were specified - notify user
+        echo "Specify at least one package"
+    else
+        # run stow command passing possible options and built arguments
+        stow $stow_exec_option $stow_args
+    fi
+}
+
+
+# stow in simulation mode
+function stow-simulate() { __stow_execute $@ -n ; }
+
+# actual stow packaging
+function stow-do() { __stow_execute $@ ; }
+
+# stow packaging with --adopt flag (kind of force - use it with caution as it will modify already stored content)
+function stow-force() { __stow_execute $@ --adopt ; }
+
+# un-stow
+function stow-unstow() { __stow_execute $@ -D ; }
+
+# re-stow
+function stow-restow() { __stow_execute $@ -R ; }
+
+
+# enable autocompletion for custom stow functions
+complete -o nospace -F __stow_package_completion "stow-simulate"
+complete -o nospace -F __stow_package_completion "stow-do"
+complete -o nospace -F __stow_package_completion "stow-force"
+complete -o nospace -F __stow_package_completion "stow-unstow"
+complete -o nospace -F __stow_package_completion "stow-restow"
+
+
+### Inspirations:
+###
+### https://www.baeldung.com/linux/check-bash-array-contains-value
+### https://www.baeldung.com/linux/shell-auto-completion
+### https://unix.stackexchange.com/questions/564759/can-a-bash-script-include-its-own-auto-completions
