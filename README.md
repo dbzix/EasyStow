@@ -1,26 +1,42 @@
 # EasyStow  - dotfiles made simple!
 
-**EasyStow** is nothing more than a set of custom `bash` aliases and functions that make work with your [dotfiles](https://en.wikipedia.org/wiki/Hidden_file_and_hidden_directory) pleasant.\
-Uses [GNU Stow.](https://www.gnu.org/software/stow/manual/stow.html)
+**EasyStow** is a set of custom `bash` commands built over the [GNU Stow](https://www.gnu.org/software/stow/manual/stow.html) to make [dotfiles](https://en.wikipedia.org/wiki/Hidden_file_and_hidden_directory) management pleasant.
 > **Note**: `GNU stow` operates on [packages](https://www.gnu.org/software/stow/manual/stow.html#Terminology) - minimal working units that represent collections of files and directories to back up.
 
-## Installation
+## Why?
 
-Install *GNU Stow*:
-```bash
-$ apt install stow
-```
-Load script into your current *shell session*:
-```bash
-source .bashrc_easystow
-```
-Done!\
-Now you can use helpers defined in this script to manipulate your *[dotfiles](https://dotfiles.github.io/)* easily!
+Some time ago, I started using *GNU Stow* to manage my *[dotfiles](https://dotfiles.github.io/)*. After I've played with it for some time, I realized that the workflow it proposes is just not too comfortable. Why is that?
 
-## Storage structure
+By default, *GNU Stow* implies that the [stow directory](https://www.gnu.org/software/stow/manual/stow.html#Terminology) is your current directory, and your [target directory](https://www.gnu.org/software/stow/manual/stow.html#Terminology) is just its parent. In this case, you don't have to specify additional options to execute the `stow` command - everything is fine by default.
 
-**EasyStow** is assumed to be working with certain backup storage structure.\
-By default it is:
+But if your storage structure differs a bit, then things become complicated. You have to specify paths to your *stow directory* and to your *target directory* (depending on your current location). And you need to have a mental map of your backup storage to specify all this stuff properly.
+
+**So, at some moment things became too complicated for me**.\
+I just wanted to manage my *stow* packages without specifying tons of additional information - by running simple commands that expect only package names to process. Also, it would be nice to have some autocompletions. You know, just in case.
+
+And I decided to write a set of custom tools over *GNU Stow* to make my life easier.
+
+## How?
+
+I wrote the `bash` script that defines custom commands (implemented as simple `bash` aliases and functions) for manipulating *stow* backups.\
+These commands are:
+- aliases:
+    > `stow-ls-structure` - to show the structure of backup storage\
+    > `stow-ls-packages` - to list all stowed packages
+- functions:
+    > `stow-simulate` - to run stow packaging in simulation mode (`stow` option `-n`)\
+    > `stow-do` - to stow packages\
+    > `stow-force` - to stow packages in forced mode (`stow` option `--adopt`)\
+    > `stow-unstow` - to un-stow packages (`stow` option `-D`)\
+    > `stow-restow` - to re-stow packages (`stow` option `-R`)
+
+From now on, I can manage my backups **from any place** in my system and **without providing** tons of additional arguments.\
+Also, thanks to **autocompletion** implemented in the script, every custom *stow*-function helps me manage my backups conveniently.
+
+## Backup storage structure
+
+**EasyStow** is assumed to be working with a certain structure of backup storage.\
+By default, it is:
 ```
 $HOME/backup/dotfiles
              ├── dotconfig
@@ -31,84 +47,143 @@ $HOME/backup/dotfiles
                  ├── homeroot
                  └── other
 ```
-which is stored in `$HOME/backup/dotfiles` directory.
+Here, the `$HOME/backup/dotfiles` directory is the root of backup storage.\
+In `secrets` are stored configuration backups that include sensitive data (passwords, auth keys, GPG keys, etc.)
 
-Here, `dotfiles` is a root of your stow storage.\
-In `secrets` you backup configurations that include any sensitive data (passwords, auth keys, GPG keys, etc.)
+Other than that, all configuration *packages* are split into **categories** (kind of labels).\
+The script defines three default *categories*:
+ - `homeroot` - for storing configurations from the `$HOME` directory
+ - `dotconfig` - for storing configurations from the `$HOME/.config` directory
+ - `other` - for storing configurations from other places (e.g. `$HOME/.local/`)
 
-Other than that, all configuration *packages* are split into **categories**.\
-The script defines three *categories*:
- - `homeroot` - stores configurations that are from your `$HOME` directory
- - `dotfiles` - stores configurations that are from your `$HOME/.config` directory
- - `other` - stores all other configurations
+## Installation
 
-## Implementation
+Install *GNU Stow*:
+```bash
+$ apt install stow
+```
+Load script into your current *shell*:
+```bash
+source .bashrc_easystow
+```
+Done!\
+Now you can use custom *stow*-commands to manipulate your *dotfiles* **easily**!
 
-Helper script defines some aliases and functions to manipulate your dotfiles backup.\
-They are:
-- aliases:
-    > `stow-ls-structure` - to show storage structure\
-    > `stow-ls-packages` - to list all stowed packages
-- functions:
-    > `stow-simulate` - to run stow packaging in simulation mode (`stow` option `-n`)\
-    > `stow-do` - to stow packages\
-    > `stow-force` - to stow packages in forced mode (`stow` option `--adopt`)\
-    > `stow-unstow` - to un-stow packages (`stow` option `-D`)\
-    > `stow-restow` - to re-stow packages (`stow` option `-R`)
+<details>
+  <summary>Want to persist these commands for later use?</summary>
+  
+  1. Place the `.bashrc_easystow` file into your `$HOME` directory.
+  2. Add the following lines at the end of your `.bashrc` file:
+      ```
+      # dotfiles (EasyStow)
+      if [ -f $HOME/.bashrc_easystow ]; then
+          . $HOME/.bashrc_easystow
+      fi
+      ```
+</details>
 
-Every custom *stow*-function **uses autocompletion** to help you manage your `stow` backup storage in a most productive way.
-
-## Usage / Examples
+## Usage
  
-How do you use **EasyStow**?
+The usage is:
+```bash
+stow-command [secrets] <category> <package> [<package> <package> ...] [-v]
+```
+where `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-unstow`, and `stow-restow`.
 
- 1. To simulate what `stow` will do for you:
-    ```
-    stow-simulate secrets homeroot ssh
-     ```
-    >  This way you ensure what exactly will be done on your system after applying `stow` command.\
-    > Here you ran simulation on your *secret* `ssh` package under `homeroot` category.
+<details>
+    <summary>The <tt>-v</tt> option is for additional verbosity.</summary>
 
-2. To stow *new piece* of configuration, or to apply stowed configuration on *new machine*:
-    ```
-    stow-do homeroot bash
-    ```
-    > In this example you stow your `bash` configuration package inside `homeroot` category in your *storage root*.
+  Compare this:
+  ```bash
+  $ stow-do homeroot git
+  $
+  ```
 
-3. If you apply previous command and `stow` rejects it, this is probably because some program replaced symlink(s) with pure file(s).\
-You may force `stow` to **rewrite** your stowed configuration with new content by calling:
-    ```
-    stow-force homeroot goldendict
-    ```
-    > You should use this command **with caution**, because old stowed content will be **replaced** with the new one.
+  and this:
+  ```bash
+  $ stow-do homeroot git -v
+  stow dir is /home/username/backup/dotfiles/homeroot
+  stow dir path relative to target /home/username is backup/dotfiles/homeroot
+  Planning stow of package git...
+  --- Skipping .gitignore as it already points to backup/dotfiles/homeroot/git/.gitignore
+  --- Skipping .gitconfig as it already points to backup/dotfiles/homeroot/git/.gitconfig
+  Planning stow of package git... done
+  Processing tasks...
+  $
+  ```
 
-4. To un-stow (*remove symlinks* to stowed package), you use:
-    ```
-    stow-unstow homeroot kazam
-    ```
-    > This might be helpful when you *uninstall* some software and you don't need unnecessary symlinks.
+  The `-v` option may help you understand what's happening in some cases.\
+  You may add more `-v` flags. They will be passed to `stow` command, adding even more verbosity.
+</details>
 
-5. To re-stow (*remove* and then *re-create* symlinks):
-     ```
-     stow-restow dotfiles user-dirs
-    ```
-    >  The *same effect* as when calling `stow-unstow` and then `stow-do`.
+## Examples
+
+<details>
+  <summary>1. Simulate what <i>stow</i> will do for you.</summary>
+
+  ```bash
+  stow-simulate secrets homeroot ssh
+  ```
+
+  > This way you ensure what exactly will be done on your system after applying the `stow` command.\
+  > Here you ran the `stow` simulation on your *secret* `ssh` package which is stowed under the `homeroot` category.
+</details>
+
+<details>
+  <summary>2. Store <i>new piece</i> of configuration <b>/</b> Apply stowed configuration on <i>new machine</i>.</summary>
+
+  ```bash
+  stow-do homeroot bash
+  ```
+
+  > In this example you stow your `bash` configuration package inside the `homeroot` category under  your *storage root*.
+</details>
+
+<details>
+  <summary>3. Update stowed content.</summary>
+
+  Some programs tend to replace symlink(s) with plain file(s).\
+  In this case, when you apply the `stow-do` command, `stow` rejects it.
+  If that is the case, you may force `stow` to **rewrite** your stowed configuration with new content and then re-create symlinks by executing:
+  
+  ```bash
+  stow-force homeroot goldendict
+  ```
+
+  > You should use this command **with caution** because old stowed content will be **replaced** with the new one.\
+  > You are safe here if you use `git` to track the changes you make in your backups.
+</details>
+
+<details>
+  <summary>4. Un-stow (<i>remove symlinks</i> to stowed package).</summary>
+
+  ```bash
+  stow-unstow homeroot kazam
+  ```
+
+  > This might be helpful when you *uninstall* some software, and you don't need unnecessary symlinks in your system.
+</details>
+
+<details>
+  <summary>5. Re-stow (<i>remove</i> and then <i>re-create</i> symlinks).</summary>
+
+  ```bash
+  stow-restow dotfiles user-dirs
+  ```
+  
+  >  The *same effect* as when calling `stow-unstow` and then `stow-do`.
+</details>
 
 ## Customization
-*Categories* are stored in **\_\_DF\_\*** variables defined inside `.bashrc_easystow`, as well as the *root storage path* and path to *secrets*.\
-**These are configurable things!**
 
-All you need to do for customizing is just:
-- add/remove/change your categories
-- update **\_\_DF\_CATEGORIES** variable with appropriate categories you've set
-- change paths if needed
-
-More information is in script itself - it is very self-describing thing.
+Storage configuration is defined in a set of **\_\_DF\_\*** variables that you can customize.\
+You may easily adapt it for your storage and your workflow.
 
 Happy **EasyStow**-ing your data! :tada:
 
 ## Do you like EasyStow?
-Please, donate:
+
+Feel free to support my work:
 
 | Cryptocurrency | Address |
 | --- | --- |

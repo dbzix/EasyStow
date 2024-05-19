@@ -51,19 +51,17 @@
 
 
 # 'DF' stands for 'DOTFILES'
-__DF_ROOT=$HOME/backup/dotfiles  # root storage directory
-__DF_SECRETS=secrets             # sub-directory name for packages with sensitive info (passwords, auth tokens, etc.)
-__DF_SECRETS_ROOT=$__DF_ROOT/$__DF_SECRETS  # root secrets sub-directory
-__DF_CATEGORY_DOTCONF=dotconfig       # inner directory name for packages in category 'dotconfig'
-__DF_CATEGORY_HOME=homeroot           # inner directory name for packages in category 'homeroot'
-__DF_CATEGORY_OTHER=other             # inner directory name for packages in category 'other'
-__DF_CATEGORIES="$__DF_CATEGORY_DOTCONF $__DF_CATEGORY_HOME $__DF_CATEGORY_OTHER"    # all categories
+__DF_STOW_ROOT_DIR=$HOME/backup/dotfiles  # root storage directory
+__DF_TARGET_DIR=$HOME  # target directory
+__DF_SECRETS=secrets  # sub-directory name for packages with sensitive info (passwords, auth tokens, etc.)
+__DF_SECRETS_ROOT_DIR=$__DF_STOW_ROOT_DIR/$__DF_SECRETS  # root secrets sub-directory
+__DF_CATEGORIES="dotconfig homeroot other"  # all categories
 
 
-alias stow-ls-structure="env tree -dL 1 -I $__DF_SECRETS $__DF_ROOT --noreport &&
-                         env tree -dL 1 $__DF_SECRETS_ROOT --noreport"
-alias stow-ls-packages="env tree -dL 2 -I $__DF_SECRETS $__DF_ROOT --noreport &&
-                        env tree -dL 2 $__DF_SECRETS_ROOT --noreport"
+alias stow-ls-structure="env tree -dL 1 -I $__DF_SECRETS $__DF_STOW_ROOT_DIR --noreport &&
+                         env tree -dL 1 $__DF_SECRETS_ROOT_DIR --noreport"
+alias stow-ls-packages="env tree -dL 2 -I $__DF_SECRETS $__DF_STOW_ROOT_DIR --noreport &&
+                        env tree -dL 2 $__DF_SECRETS_ROOT_DIR --noreport"
 
 
 # General autocompletion function for using in specific functions.
@@ -85,22 +83,22 @@ function __stow_package_completion(){
         # no args specified yet - choose category or 'secrets'
 
         # autocomplete with actual (existing) categories in root storage directory + 'secrets' directory
-        root_categories=$(cd $__DF_ROOT && env ls -d $__DF_CATEGORIES 2>/dev/null)
+        root_categories=$(cd $__DF_STOW_ROOT_DIR && env ls -d $__DF_CATEGORIES 2>/dev/null)
         completions="$root_categories $__DF_SECRETS"
     elif [ $arg1 == $__DF_SECRETS ] && [ $COMP_CWORD -eq 2 ]; then
         # first arg is 'secrets', no 2nd arg specified yet - choose category under 'secrets'
 
         # autocomplete with actual (existing) categories in 'secrets' sub-directory
-        completions="$(cd $__DF_SECRETS_ROOT && env ls -d $__DF_CATEGORIES 2>/dev/null)"
+        completions="$(cd $__DF_SECRETS_ROOT_DIR && env ls -d $__DF_CATEGORIES 2>/dev/null)"
     elif [[ ${categories_array[@]} =~ $arg1 ]]; then
         # first arg is a package category - choose package
 
-        completions=$(env ls $__DF_ROOT/$arg1 $(__build_completion_exclusions ${COMP_WORDS[@]}))
+        completions=$(env ls $__DF_STOW_ROOT_DIR/$arg1 $(__build_completion_exclusions ${COMP_WORDS[@]}))
     elif [ "$arg1" == "$__DF_SECRETS" ] && [[ ${categories_array[@]} =~ $arg2 ]]; then
         # first arg is 'secrets'
         # second arg is a package category - choose package
 
-        completions=$(env ls $__DF_ROOT/$arg1/$arg2 $(__build_completion_exclusions ${COMP_WORDS[@]}))
+        completions=$(env ls $__DF_STOW_ROOT_DIR/$arg1/$arg2 $(__build_completion_exclusions ${COMP_WORDS[@]}))
     fi
     COMPREPLY=($(compgen -W "$completions" -- $latest))
     return 0
@@ -122,7 +120,7 @@ function __build_completion_exclusions() {
 function __build_stow_args() {
     arg_num=1
     directories=($__DF_CATEGORIES $__DF_SECRETS)
-    path_to_packages=$__DF_ROOT
+    path_to_packages=$__DF_STOW_ROOT_DIR
 
     for arg in $@; do
         if [[ ${directories[@]} =~ $arg ]]; then
@@ -139,7 +137,7 @@ function __build_stow_args() {
         return 1 # no packages specified
     fi
 
-    stow_args="-v -d $path_to_packages -t $HOME $stow_packages"
+    stow_args="-v -d $path_to_packages -t $__DF_TARGET_DIR $stow_packages"
     echo $stow_args # result will be evaluated by calling function
 }
 
@@ -185,11 +183,11 @@ function stow-restow() { __stow_execute $@ -R ; }
 
 
 # enable autocompletion for custom stow functions
-complete -o nospace -F __stow_package_completion "stow-simulate"
-complete -o nospace -F __stow_package_completion "stow-do"
-complete -o nospace -F __stow_package_completion "stow-force"
-complete -o nospace -F __stow_package_completion "stow-unstow"
-complete -o nospace -F __stow_package_completion "stow-restow"
+complete -F __stow_package_completion "stow-simulate"
+complete -F __stow_package_completion "stow-do"
+complete -F __stow_package_completion "stow-force"
+complete -F __stow_package_completion "stow-unstow"
+complete -F __stow_package_completion "stow-restow"
 
 
 ### Inspirations:
