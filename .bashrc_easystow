@@ -77,6 +77,8 @@ function __stow_package_completion(){
 
     arg1="${COMP_WORDS[1]}"
     arg2="${COMP_WORDS[2]}"
+    arg1_regex_exact="\<${arg1}\>"  # will test for exact value, not regex part
+    arg2_regex_exact="\<${arg2}\>"  # will test for exact value, not regex part
     completions=""
 
     if [ $COMP_CWORD -eq 1 ]; then
@@ -90,15 +92,15 @@ function __stow_package_completion(){
 
         # autocomplete with actual (existing) categories in 'secrets' sub-directory
         completions="$(cd $__DF_SECRETS_ROOT_DIR && env ls -d $__DF_CATEGORIES 2>/dev/null)"
-    elif [[ ${categories_array[@]} =~ $arg1 ]]; then
+    elif [[ ${categories_array[@]} =~ $arg1_regex_exact ]]; then
         # first arg is a package category - choose package
 
-        completions=$(env ls $__DF_STOW_ROOT_DIR/$arg1 $(__build_completion_exclusions ${COMP_WORDS[@]}))
-    elif [ "$arg1" == "$__DF_SECRETS" ] && [[ ${categories_array[@]} =~ $arg2 ]]; then
+        completions=$(env ls $__DF_STOW_ROOT_DIR/$arg1 $(__build_comp_exclusions ${COMP_WORDS[@]}) 2>/dev/null)
+    elif [ $arg1 == $__DF_SECRETS ] && [[ ${categories_array[@]} =~ $arg2_regex_exact ]]; then
         # first arg is 'secrets'
         # second arg is a package category - choose package
 
-        completions=$(env ls $__DF_STOW_ROOT_DIR/$arg1/$arg2 $(__build_completion_exclusions ${COMP_WORDS[@]}))
+        completions=$(env ls $__DF_STOW_ROOT_DIR/$arg1/$arg2 $(__build_comp_exclusions ${COMP_WORDS[@]}) 2>/dev/null)
     fi
     COMPREPLY=($(compgen -W "$completions" -- $latest))
     return 0
@@ -106,7 +108,7 @@ function __stow_package_completion(){
 
 # Build exclusions for completions we already selected, echo result (as bash cannot return strings).
 # This result will be evaluated by calling function.
-function __build_completion_exclusions() {
+function __build_comp_exclusions() {
     exclusions=""  # -I option for ls command excludes files enumerated after it from displaying
     for package in $@; do
         exclusions+=" -I $package"
@@ -123,7 +125,8 @@ function __build_stow_args() {
     path_to_packages=$__DF_STOW_ROOT_DIR
 
     for arg in $@; do
-        if [[ ${directories[@]} =~ $arg ]]; then
+        arg_regex_exact="\<${arg}\>"  # will test for exact value, not regex part
+        if [[ ${directories[@]} =~ $arg_regex_exact ]]; then
             path_to_packages+="/$arg"
             ((arg_num++))
         else
@@ -131,13 +134,45 @@ function __build_stow_args() {
         fi
     done
 
-    # remainder args - treat them as stow packages
-    stow_packages=${@:$arg_num}
-    if [ -z "$stow_packages" ]; then
-        return 1 # no packages specified
+    # check whether any category selected
+    roots=($__DF_STOW_ROOT_DIR $__DF_SECRETS_ROOT_DIR)
+    if [[ ${roots[@]} =~ $path_to_packages ]]; then
+        return 1  # no packages can be listed in stow root or 'secrets'
     fi
 
-    stow_args="-v -d $path_to_packages -t $__DF_TARGET_DIR $stow_packages"
+    stow_packages=""
+    stow_options=""
+    # remainder args - treat them either as stow options (when arg begins with '-') or as stow packages
+    for arg in ${@:$arg_num}; do
+        if [[ $arg == -* ]]; then
+            stow_options+=" $arg"
+        else
+            stow_packages+=" $arg"
+        fi
+    done
+
+    # some category selected
+    if [ -z "$stow_packages" ]; then
+        # no packages specified - treat it as 'all packages in category'
+        stow_packages=$(env ls $path_to_packages 2>/dev/null)
+        if [ -z "$stow_packages" ]; then
+            return 1 # no packages were listed in selected category
+        else
+            if [ ${@:((arg_num-2)):1} == $__DF_SECRETS ]; then
+                echo 1>&2 "Processing *all* packages in '${@:((arg_num-1)):1}' category of '$__DF_SECRETS' ..."
+            else
+                echo 1>&2 "Processing *all* packages in '${@:((arg_num-1)):1}' category ..."
+            fi
+        fi
+    else
+        if [ ${@:((arg_num-2)):1} == $__DF_SECRETS ]; then
+            echo 1>&2 "Processing packages in '${@:((arg_num-1)):1}' category of '$__DF_SECRETS':$stow_packages"
+        else
+            echo 1>&2 "Processing packages in '${@:((arg_num-1)):1}' category:$stow_packages"
+        fi
+    fi
+
+    stow_args="-v -d $path_to_packages -t $__DF_TARGET_DIR $stow_packages $stow_options"
     echo $stow_args # result will be evaluated by calling function
 }
 
@@ -158,7 +193,7 @@ function __stow_execute() {
     retval=$?
     if [ $retval -ne 0 ]; then
         # if return value is not 0, then no packages were specified - notify user
-        echo "Specify at least one package"
+        echo "Please specify either category and at least one package or just category"
     else
         # run stow command passing possible options and built arguments
         stow $stow_exec_option $stow_args
