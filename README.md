@@ -88,20 +88,29 @@ The usage is:
 ```bash
 stow-command [secrets] <category> <package> [<package> <package> ...] [-v]
 ```
-where `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-unstow`, and `stow-restow`.
+for manipulating ***specific packages*** in selected *category*;\
+or:
+```bash
+stow-command [secrets] <category> [-v]
+```
+for manipulating ***all packages*** in selected *category*.
+
+Here, `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-unstow`, and `stow-restow`.
 
 <details>
     <summary>The <tt>-v</tt> option is for additional verbosity.</summary>
 
   Compare this:
-  ```bash
+  ```
   $ stow-do homeroot git
+  Processing packages in 'homeroot' category: git
   $
   ```
 
   and this:
-  ```bash
+  ```
   $ stow-do homeroot git -v
+  Processing packages in 'homeroot' category: git
   stow dir is /home/username/backup/dotfiles/homeroot
   stow dir path relative to target /home/username is backup/dotfiles/homeroot
   Planning stow of package git...
@@ -121,7 +130,7 @@ where `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
 <details>
   <summary>1. Simulate what <i>stow</i> will do for you.</summary>
 
-  ```bash
+  ```
   stow-simulate secrets homeroot ssh
   ```
 
@@ -132,7 +141,7 @@ where `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
 <details>
   <summary>2. Store <i>new piece</i> of configuration <b>/</b> Apply stowed configuration on <i>new machine</i>.</summary>
 
-  ```bash
+  ```
   stow-do homeroot bash
   ```
 
@@ -146,7 +155,7 @@ where `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
   In this case, when you apply the `stow-do` command, `stow` rejects it.
   If that is the case, you may force `stow` to **rewrite** your stowed configuration with new content and then re-create symlinks by executing:
   
-  ```bash
+  ```
   stow-force homeroot goldendict
   ```
 
@@ -157,7 +166,7 @@ where `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
 <details>
   <summary>4. Un-stow (<i>remove symlinks</i> to stowed package).</summary>
 
-  ```bash
+  ```
   stow-unstow homeroot kazam
   ```
 
@@ -167,7 +176,7 @@ where `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
 <details>
   <summary>5. Re-stow (<i>remove</i> and then <i>re-create</i> symlinks).</summary>
 
-  ```bash
+  ```
   stow-restow dotfiles user-dirs
   ```
   
