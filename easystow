@@ -1,44 +1,41 @@
 ########################################################################################################################
-# GNU stow helpers
+# EasyStow - GNU Stow helpers
 
-
-# GNU stow operates on packages - minimal working units that represent collections of files and directories to back up:
+########################################################################################################################
+#
+# GNU Stow operates on packages - minimal working units that represent collections of files and directories to back up:
 # https://www.gnu.org/software/stow/manual/stow.html#Terminology
 #
-# E.g. in your $HOME/backup/dotfiles you have directory 'homeroot' where you plan to store
-# packages that represent config files stored in your home directory.
+########################################################################################################################
 #
-# Then you might have sub-dirs homeroot/bash and homeroot/zsh, each storing a set of config files for respective shell.
-# Here 'bash' and 'zsh' are packages.
-# While 'homeroot' is a kind of category for convenient labeling of miscellaneous configurations.
+# EasyStow operates on categories and packages.
 #
-# Current implementation defines three categories:
-#   - homeroot  - for storing configurations from $HOME directory
-#   - dotconfig - for storing configurations from $HOME/.config directory
-#   - other     - for storing configurations from other places
+# What you have inside your root dotfiles directory are categories, with one special category - 'secrets' - which has
+# its own sub-categories. The purpose of 'secrets' category is to back up anything that contains sensitive data like
+# passwords, auth keys, etc.
 #
-# So, the backup storage is located in $HOME/backup/dotfiles and uses following structure:
+# What's inside categories and sub-categories is treated as packages.
+#
+########################################################################################################################
+#
+# E.g. in your '$HOME/backup/dotfiles' you have category directory 'shells' where you plan to store packages
+# that represent miscellaneous shell-related config files.
+#
+# Then you might have sub-directoriess 'shells/bash' and 'shells/zsh', each storing a set of config files
+# for respective shell. Here 'bash' and 'zsh' are packages.
+#
+# Example of categories layout:
 #    dotfiles
-#        ├── dotconfig
-#        ├── homeroot
-#        └── other
-#        dotfiles/secrets
-#        ├── dotconfig
-#        ├── homeroot
-#        └── other
+#    ├── configs
+#    ├── shells
+#    ├── tools
+#    └── secrets
+#        ├── encryption
+#        └── remote
 #
-# Secrets (located in a 'secrets' sub-dir) is a sub-storage for backing up anything that contains
-# passwords, auth keys, and any other kinds of sensitive information.
+########################################################################################################################
 #
-# Categories are stored in __DF_* variables defined below, as well as the root storage path and path to 'secrets'.
-# These are configurable things.
-# Just:
-#    - add/remove/change your categories
-#    - change paths if needed
-#    - update __DF_CATEGORIES variable with appropriate categories
-
-
-# Next aliases and functions are at your disposal:
+# Several aliases and functions are at your disposal:
 #    stow-ls-structure - for listing storage structure (tree-view)
 #    stow-ls-packages  - for listing all stowed packages (tree-view)
 #
@@ -48,32 +45,40 @@
 #    stow-unstow   - for un-stowing packages (stow option -D)
 #    stow-restow   - for re-stowing packages (stow option -R)
 #
+########################################################################################################################
+#
+# Customization
+#
+# You may define DOTFILES_ROOT_DIR environment variable to point EasyStow to your dotfiles.
 
 
-# 'DF' stands for 'DOTFILES'
-__DF_STOW_ROOT_DIR=$HOME/backup/dotfiles  # root storage directory
-__DF_TARGET_DIR=$HOME  # target directory
-__DF_SECRETS=secrets  # sub-directory name for packages with sensitive info (passwords, auth tokens, etc.)
-__DF_SECRETS_ROOT_DIR=$__DF_STOW_ROOT_DIR/$__DF_SECRETS  # root secrets sub-directory
-__DF_CATEGORIES="dotconfig homeroot other"  # all categories
+__EASYSTOW_ROOT_DIR="${DOTFILES_ROOT_DIR:-$HOME/backup/dotfiles}"  # root storage directory
+__EASYSTOW_TARGET_DIR=$HOME  # target directory
+__EASYSTOW_SECRETS_NAME=secrets  # sub-directory name for packages with sensitive info (passwords, auth tokens, etc.)
+__EASYSTOW_SECRETS_ROOT_DIR=$__EASYSTOW_ROOT_DIR/$__EASYSTOW_SECRETS_NAME  # root secrets directory
 
 
-alias stow-ls-structure="env tree -dL 1 -I $__DF_SECRETS $__DF_STOW_ROOT_DIR --noreport &&
-                         env tree -dL 1 $__DF_SECRETS_ROOT_DIR --noreport"
-alias stow-ls-packages="env tree -dL 2 -I $__DF_SECRETS $__DF_STOW_ROOT_DIR --noreport &&
-                        env tree -dL 2 $__DF_SECRETS_ROOT_DIR --noreport"
+alias stow-ls-structure="env tree -dL 1 -I $__EASYSTOW_SECRETS_NAME $__EASYSTOW_ROOT_DIR --noreport &&
+                         env tree -dL 1 $__EASYSTOW_SECRETS_ROOT_DIR --noreport"
+alias stow-ls-packages="env tree -dL 2 -I $__EASYSTOW_SECRETS_NAME $__EASYSTOW_ROOT_DIR --noreport &&
+                        env tree -dL 2 $__EASYSTOW_SECRETS_ROOT_DIR --noreport"
 
 
 # General autocompletion function for using in specific functions.
 # Usage examples for function 'foo' bound to use completions:
-#      foo <TAB><TAB> -> should output "dotconfig homeroot other secrets"
-#      foo sec<TAB><TAB> -> should output "secrets"
-#      foo secrets <TAB><TAB> -> should output "dotconfig homeroot"
-#      foo dotconfig <TAB><TAB> -> should output packages in category 'dotconfig'
-#      foo secrets homeroot <TAB><TAB> -> should output packages in category 'homeroot' of 'secrets' sub-storage
+#      foo <TAB><TAB> -> would output "configs shells tools" or whatever categories you have in dotfiles root
+#      foo sec<TAB><TAB> -> will output "secrets"
+#      foo secrets <TAB><TAB> -> would output "encryption remote" or whatever categories you have in your secrets root
+#      foo shells <TAB><TAB> -> should output packages in category 'shells'
+#      foo secrets remote <TAB><TAB> -> should output packages in sub-category 'remote' of 'secrets' category 
 function __stow_package_completion(){
     latest="${COMP_WORDS[$COMP_CWORD]}"
-    categories_array=($__DF_CATEGORIES)
+
+    root_categories=$(cd $__EASYSTOW_ROOT_DIR && env ls -d */ 2>/dev/null | sed 's:/$::' 2>/dev/null)
+    root_categories_array=($root_categories)
+
+    secret_categories=$(cd $__EASYSTOW_SECRETS_ROOT_DIR && env ls -d */ 2>/dev/null | sed 's:/$::' 2>/dev/null)
+    secret_categories_array=($secret_categories)
 
     arg1="${COMP_WORDS[1]}"
     arg2="${COMP_WORDS[2]}"
@@ -84,23 +89,22 @@ function __stow_package_completion(){
     if [ $COMP_CWORD -eq 1 ]; then
         # no args specified yet - choose category or 'secrets'
 
-        # autocomplete with actual (existing) categories in root storage directory + 'secrets' directory
-        root_categories=$(cd $__DF_STOW_ROOT_DIR && env ls -d $__DF_CATEGORIES 2>/dev/null)
-        completions="$root_categories $__DF_SECRETS"
-    elif [ $arg1 == $__DF_SECRETS ] && [ $COMP_CWORD -eq 2 ]; then
-        # first arg is 'secrets', no 2nd arg specified yet - choose category under 'secrets'
+        # autocomplete with categories in root dotfiles directory
+        completions="$root_categories"
+    elif [ $arg1 == $__EASYSTOW_SECRETS_NAME ] && [ $COMP_CWORD -eq 2 ]; then
+        # first arg is 'secrets', no 2nd arg specified yet - choose sub-category under 'secrets'
 
-        # autocomplete with actual (existing) categories in 'secrets' sub-directory
-        completions="$(cd $__DF_SECRETS_ROOT_DIR && env ls -d $__DF_CATEGORIES 2>/dev/null)"
-    elif [[ ${categories_array[@]} =~ $arg1_regex_exact ]]; then
-        # first arg is a package category - choose package
-
-        completions=$(env ls $__DF_STOW_ROOT_DIR/$arg1 $(__build_comp_exclusions ${COMP_WORDS[@]}) 2>/dev/null)
-    elif [ $arg1 == $__DF_SECRETS ] && [[ ${categories_array[@]} =~ $arg2_regex_exact ]]; then
+        # autocomplete with sub-categories in 'secrets' category
+        completions="$secret_categories"
+    elif [ $arg1 == $__EASYSTOW_SECRETS_NAME ] && [[ ${secret_categories_array[@]} =~ $arg2_regex_exact ]]; then
         # first arg is 'secrets'
-        # second arg is a package category - choose package
+        # second arg is a secrets sub-category - choose package
 
-        completions=$(env ls $__DF_STOW_ROOT_DIR/$arg1/$arg2 $(__build_comp_exclusions ${COMP_WORDS[@]}) 2>/dev/null)
+        completions=$(env ls $__EASYSTOW_ROOT_DIR/$arg1/$arg2 $(__build_comp_exclusions ${COMP_WORDS[@]}) 2>/dev/null)
+    elif [[ ${root_categories_array[@]} =~ $arg1_regex_exact ]]; then
+        # first arg is a root category - choose package
+
+        completions=$(env ls $__EASYSTOW_ROOT_DIR/$arg1 $(__build_comp_exclusions ${COMP_WORDS[@]}) 2>/dev/null)
     fi
     COMPREPLY=($(compgen -W "$completions" -- $latest))
     return 0
@@ -121,9 +125,12 @@ function __build_comp_exclusions() {
 # Remainder args will be treaded as stow packages.
 function __build_stow_args() {
     arg_num=1
-    directories=($__DF_CATEGORIES $__DF_SECRETS)
-    path_to_packages=$__DF_STOW_ROOT_DIR
+    directories=($(cd $__EASYSTOW_ROOT_DIR && env ls -d */ 2>/dev/null | sed 's:/$::' 2>/dev/null)
+                 $(cd $__EASYSTOW_SECRETS_ROOT_DIR && env ls -d */ 2>/dev/null | sed 's:/$::' 2>/dev/null)
+                )
+    path_to_packages=$__EASYSTOW_ROOT_DIR  # start building path to packages from root dir
 
+    # build path to packages from args (when category selected, it appends to this path)
     for arg in $@; do
         arg_regex_exact="\<${arg}\>"  # will test for exact value, not regex part
         if [[ ${directories[@]} =~ $arg_regex_exact ]]; then
@@ -135,7 +142,7 @@ function __build_stow_args() {
     done
 
     # check whether any category selected
-    roots=($__DF_STOW_ROOT_DIR $__DF_SECRETS_ROOT_DIR)
+    roots=($__EASYSTOW_ROOT_DIR $__EASYSTOW_SECRETS_ROOT_DIR)
     if [[ ${roots[@]} =~ $path_to_packages ]]; then
         return 1  # no packages can be listed in stow root or 'secrets'
     fi
@@ -158,21 +165,21 @@ function __build_stow_args() {
         if [ -z "$stow_packages" ]; then
             return 1 # no packages were listed in selected category
         else
-            if [ ${@:((arg_num-2)):1} == $__DF_SECRETS ]; then
-                echo 1>&2 "Processing *all* packages in '${@:((arg_num-1)):1}' category of '$__DF_SECRETS' ..."
+            if [ ${@:((arg_num-2)):1} == $__EASYSTOW_SECRETS_NAME ]; then
+                echo 1>&2 "Processing *all* packages in '${@:((arg_num-1)):1}' category of '$__EASYSTOW_SECRETS_NAME' ..."
             else
                 echo 1>&2 "Processing *all* packages in '${@:((arg_num-1)):1}' category ..."
             fi
         fi
     else
-        if [ ${@:((arg_num-2)):1} == $__DF_SECRETS ]; then
-            echo 1>&2 "Processing packages in '${@:((arg_num-1)):1}' category of '$__DF_SECRETS':$stow_packages"
+        if [ ${@:((arg_num-2)):1} == $__EASYSTOW_SECRETS_NAME ]; then
+            echo 1>&2 "Processing packages in '${@:((arg_num-1)):1}' category of '$__EASYSTOW_SECRETS_NAME':$stow_packages"
         else
             echo 1>&2 "Processing packages in '${@:((arg_num-1)):1}' category:$stow_packages"
         fi
     fi
 
-    stow_args="-v -d $path_to_packages -t $__DF_TARGET_DIR $stow_packages $stow_options"
+    stow_args="-v -d $path_to_packages -t $__EASYSTOW_TARGET_DIR $stow_packages $stow_options"
     echo $stow_args # result will be evaluated by calling function
 }
 

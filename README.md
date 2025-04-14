@@ -1,60 +1,56 @@
 # EasyStow  - dotfiles made simple!
 
-**EasyStow** is a set of custom `bash` commands built over the [GNU Stow](https://www.gnu.org/software/stow/manual/stow.html) to make [dotfiles](https://en.wikipedia.org/wiki/Hidden_file_and_hidden_directory) management pleasant.
+**EasyStow** is a set of custom `bash` commands built over the [GNU Stow](https://www.gnu.org/software/stow/manual/stow.html) to make [dotfiles](https://dotfiles.github.io/) management pleasant.
 > **Note**: `GNU stow` operates on [packages](https://www.gnu.org/software/stow/manual/stow.html#Terminology) - minimal working units that represent collections of files and directories to back up.
 
 ## Why?
 
-Some time ago, I started using *GNU Stow* to manage my *[dotfiles](https://dotfiles.github.io/)*. After I've played with it for some time, I realized that the workflow it proposes is just not too comfortable. Why is that?
+When you manage dotfiles with pure `GNU Stow`, you have to retain multiple command line options in your head.
 
-By default, *GNU Stow* implies that the [stow directory](https://www.gnu.org/software/stow/manual/stow.html#Terminology) is your current directory, and your [target directory](https://www.gnu.org/software/stow/manual/stow.html#Terminology) is just its parent. In this case, you don't have to specify additional options to execute the `stow` command - everything is fine by default.
+By default, `GNU Stow` implies that the [stow directory](https://www.gnu.org/software/stow/manual/stow.html#Terminology) is your current directory, and your [target directory](https://www.gnu.org/software/stow/manual/stow.html#Terminology) is just its parent. If this is your case, you don't have to specify additional options to execute the `stow` command - everything is fine by default.
 
-But if your storage structure differs a bit, then things become complicated. You have to specify paths to your *stow directory* and to your *target directory* (depending on your current location). And you need to have a mental map of your backup storage to specify all this stuff properly.
+But if your current directory isn't where you store your dotfiles, you must provide paths to your `stow directory` and to your `target directory` (depending on your current location). This does not seem as a convenient workflow, isn't it?
 
-**So, at some moment things became too complicated for me**.\
-I just wanted to manage my *stow* packages without specifying tons of additional information - by running simple commands that expect only package names to process. Also, it would be nice to have some autocompletions. You know, just in case.
-
-And I decided to write a set of custom tools over *GNU Stow* to make my life easier.
+**So, here is the EasyStow**.
 
 ## How?
 
-I wrote the `bash` script that defines custom commands (implemented as simple `bash` aliases and functions) for manipulating *stow* backups.\
+It's just the `bash` script that defines custom commands (implemented as simple `bash` aliases and functions) for manipulating *stow* backups.\
 These commands are:
-- aliases:
-    > `stow-ls-structure` - to show the structure of backup storage\
+- aliases for expore your storage:
+    > `stow-ls-structure` - to show the structure of your dotfiles\
     > `stow-ls-packages` - to list all stowed packages
-- functions:
+- functions to manage your storage:
     > `stow-simulate` - to run stow packaging in simulation mode (`stow` option `-n`)\
     > `stow-do` - to stow packages\
     > `stow-force` - to stow packages in forced mode (`stow` option `--adopt`)\
     > `stow-unstow` - to un-stow packages (`stow` option `-D`)\
     > `stow-restow` - to re-stow packages (`stow` option `-R`)
 
-From now on, I can manage my backups **from any place** in my system and **without providing** tons of additional arguments.\
-Also, thanks to **autocompletion** implemented in the script, every custom *stow*-function helps me manage my backups conveniently.
+Using this, you can manage your backups **from any place** in the system and **without providing** any additional arguments.\
+Also, thanks to **autocompletion** implemented in the script, you have full control over your dotfiles.
 
-## Backup storage structure
+## Dotfiles storage structure
 
-**EasyStow** is assumed to be working with a certain structure of backup storage.\
-By default, it is:
+**EasyStow** operates on `categories` and `packages`.
+
+What you have inside your root dotfiles directory are `categories`, with one special category - `secrets` - which has its own `sub-categories`. The purpose of `secrets` category is to back up anything that contains sensitive data like *passwords*, *auth keys*, etc.
+
+What's inside `categories` and `sub-categories` is treated as `packages.`
+
+Example:
 ```
-$HOME/backup/dotfiles
-             ├── dotconfig
-             ├── homeroot
-             ├── other
+$HOME/backup/dotfiles (default location)
+             ├── configs
+             ├── shells
+             ├── tools
              └── secrets
-                 ├── dotconfig
-                 ├── homeroot
-                 └── other
+                 ├── encryption
+                 └── remote
 ```
-Here, the `$HOME/backup/dotfiles` directory is the root of backup storage.\
-In `secrets` are stored configuration backups that include sensitive data (passwords, auth keys, GPG keys, etc.)
-
-Other than that, all configuration *packages* are split into **categories** (kind of labels).\
-The script defines three default *categories*:
- - `homeroot` - for storing configurations from the `$HOME` directory
- - `dotconfig` - for storing configurations from the `$HOME/.config` directory
- - `other` - for storing configurations from other places (e.g. `$HOME/.local/`)
+Here, you have `category` directory `shells` where you plan to store `packages` that represent miscellaneous shell-related config files.\
+Then you might have `sub-directoriess` `shells/bash` and `shells/zsh`, each storing a set of config files for respective shell.\
+Here `bash` and `zsh` are `packages.`
 
 ## Installation
 
@@ -62,25 +58,20 @@ Install *GNU Stow*:
 ```bash
 $ apt install stow
 ```
-Load script into your current *shell*:
+Clone this repository:
 ```bash
-source .bashrc_easystow
+cd ~
+git clone https://github.com/dbzix/EasyStow
+```
+Add the following to your shell configuration (e.g. `.bashrc`):
+```bash
+export DOTFILES_ROOT_DIR=$HOME/path/to/your/dotfiles
+if [ -f $HOME/EasyStow/easystow ]; then
+    . $HOME/EasyStow/easystow
+fi
 ```
 Done!\
-Now you can use custom *stow*-commands to manipulate your *dotfiles* **easily**!
-
-<details>
-  <summary>Want to persist these commands for later use?</summary>
-  
-  1. Place the `.bashrc_easystow` file into your `$HOME` directory.
-  2. Add the following lines at the end of your `.bashrc` file:
-      ```
-      # dotfiles (EasyStow)
-      if [ -f $HOME/.bashrc_easystow ]; then
-          . $HOME/.bashrc_easystow
-      fi
-      ```
-</details>
+Now you have full control over your *dotfiles*!
 
 ## Usage
  
@@ -128,7 +119,7 @@ Here, `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
 ## Examples
 
 <details>
-  <summary>1. Simulate what <i>stow</i> will do for you.</summary>
+  <summary>1. Simulate what `stow` will do for you.</summary>
 
   ```
   stow-simulate secrets homeroot ssh
@@ -145,7 +136,7 @@ Here, `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
   stow-do homeroot bash
   ```
 
-  > In this example you stow your `bash` configuration package inside the `homeroot` category under  your *storage root*.
+  > In this example you stow your `bash` configuration package inside the `homeroot` category under your *storage root*.
 </details>
 
 <details>
@@ -182,11 +173,6 @@ Here, `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
   
   >  The *same effect* as when calling `stow-unstow` and then `stow-do`.
 </details>
-
-## Customization
-
-Storage configuration is defined in a set of **\_\_DF\_\*** variables that you can customize.\
-You may easily adapt it for your storage and your workflow.
 
 Happy **EasyStow**-ing your data! :tada:
 
