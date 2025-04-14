@@ -15,7 +15,7 @@ But if your current directory isn't where you store your dotfiles, you must prov
 
 ## How?
 
-It's just the `bash` script that defines custom commands (implemented as simple `bash` aliases and functions) for manipulating *stow* backups.\
+It's just the `bash` script that defines custom commands (implemented as simple `bash` aliases and functions) for manipulating `stow` backups.\
 These commands are:
 - aliases for expore your storage:
     > `stow-ls-structure` - to show the structure of your dotfiles\
@@ -49,7 +49,7 @@ $HOME/backup/dotfiles (default location)
                  └── remote
 ```
 Here, you have `category` directory `shells` where you plan to store `packages` that represent miscellaneous shell-related config files.\
-Then you might have `sub-directoriess` `shells/bash` and `shells/zsh`, each storing a set of config files for respective shell.\
+Then you might have `sub-directoriess` - `shells/bash` and `shells/zsh` - each storing a set of config files for respective shell.\
 Here `bash` and `zsh` are `packages.`
 
 ## Installation
@@ -173,6 +173,8 @@ Here, `stow-command` is one of: `stow-simulate`, `stow-do`, `stow-force`, `stow-
   
   >  The *same effect* as when calling `stow-unstow` and then `stow-do`.
 </details>
+
+---
 
 Happy **EasyStow**-ing your data! :tada:
 
